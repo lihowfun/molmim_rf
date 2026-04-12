@@ -1,0 +1,10 @@
+# Python 編譯快取
+__pycache__/
+*.py[cod]
+
+# VSCode / JetBrains 等 IDE 設定檔
+.vscode/
+.idea/
+
+# 系統雜項
+.DS_Store

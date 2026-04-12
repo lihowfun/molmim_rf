@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MolMIM – Reinforcement Learning Demo</title>
+
+  <!-- Tailwind CDN & Chart.js -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    #chartWrap { width: 680px; height: 400px; }
+    #molGrid   { display:grid; grid-template-columns:repeat(2,1fr);
+                 gap:1.5rem; max-width:48rem; margin:0 auto; }
+    @media (min-width:768px){ #molGrid{grid-template-columns:repeat(4,1fr);} }
+    .mol-img { width:100%; height:auto; object-fit:contain;
+               border-radius:.25rem; box-shadow:0 .5rem 1rem rgb(0 0 0 /.1); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 py-8 px-4 md:px-14">
+
+  <h1 class="text-3xl font-bold text-teal-700 mb-6">
+    MolMIM – Reinforcement Learning Demo
+  </h1>
+
+  <!-- 提示欄 -->
+  <div id="msgBar" class="hidden bg-amber-100 border border-amber-300
+       text-amber-800 px-4 py-2 rounded mb-4"></div>
+
+  <!-- ───── 表單 ───── -->
+  <form id="taskForm" class="space-y-4 max-w-2xl mx-auto">
+    <label class="block font-medium mb-1">輸入分子 (SMILES) — 只取第一行</label>
+    <textarea id="smilesTxt" rows="4"
+              class="w-full rounded border p-3"></textarea>
+
+    <div class="flex items-center space-x-4">
+      <label class="font-medium">目標指標</label>
+      <select id="targetSel" class="border rounded p-2">
+        <option value="logP" selected>logP</option>
+        <option value="QED">QED</option>
+      </select>
+    </div>
+
+    <button type="submit"
+            class="bg-teal-700 hover:bg-teal-800 text-white px-8 py-2 rounded">
+      提交任務
+    </button>
+  </form>
+
+  <!-- ───── 進度區 ───── -->
+  <section id="progressSec" class="mt-10 hidden">
+    <div id="chartWrap" class="bg-white rounded shadow p-4 mx-auto">
+      <canvas id="rlChart"></canvas>
+    </div>
+
+    <h2 class="text-lg font-semibold mt-8 mb-3 text-center">
+      本輪最佳分子 (Top-8 含起始)
+    </h2>
+    <div id="molGrid"></div>
+  </section>
+
+  <script>
+  /* -------- 全域狀態 -------- */
+  let rlChart = null;
+  let currentTarget = null;
+
+  /* -------- 建立/重建折線圖 -------- */
+  function createChart(target){
+    const ctx = document.getElementById('rlChart').getContext('2d');
+    if (rlChart) rlChart.destroy();
+
+    const teal   = '#0d9488';
+    const orange = '#f97316';
+
+    const datasets = (target === 'logP')
+      ? [
+          { label:'Median logP',      data:[],
+            borderColor:teal, tension:.3, fill:false, pointRadius:3 },
+          { label:'Median similarity',data:[],
+            borderColor:orange, tension:.3, fill:false, pointRadius:2 }
+        ]
+      : [
+          { label:'Median QED',       data:[],
+            borderColor:teal, tension:.3, fill:false, pointRadius:3 },
+          { label:'Median similarity',data:[],
+            borderColor:orange, tension:.3, fill:false, pointRadius:2 }
+        ];
+
+    rlChart = new Chart(ctx,{
+      type:'line',
+      data:{ labels:[], datasets },
+      options:{ maintainAspectRatio:false, scales:{ y:{ min:0, max:1 } } }
+    });
+  }
+
+  /* -------- DOM 物件 -------- */
+  const form        = document.getElementById('taskForm');
+  const progressSec = document.getElementById('progressSec');
+  const molGrid     = document.getElementById('molGrid');
+  const msgBar      = document.getElementById('msgBar');
+
+  /* -------- 提交表單 -------- */
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const seed   = document.getElementById('smilesTxt')
+                     .value.trim().split(/\s+/)[0];
+    const target = document.getElementById('targetSel').value;
+    if (!seed){ alert('請輸入 SMILES'); return; }
+
+    /* Reset UI */
+    msgBar.classList.add('hidden'); msgBar.textContent = '';
+    const oldBtn = document.getElementById('dlBtn'); if (oldBtn) oldBtn.remove();
+    molGrid.innerHTML = '';
+    currentTarget = target;
+    createChart(target);
+    progressSec.classList.remove('hidden');
+
+    /* 呼叫後端 */
+    const res = await fetch('/api/run',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ smiles:[seed], target })
+    });
+    const { stream_url } = await res.json();
+
+    /* SSE */
+    const es = new EventSource(stream_url);
+    es.onmessage = evt=>{
+      const d = JSON.parse(evt.data);
+
+      /* 折線更新 */
+      if (d.iters){
+        rlChart.data.labels = d.iters;
+        if (currentTarget==='logP'){
+          rlChart.data.datasets[0].data = d.med_logp;
+          rlChart.data.datasets[1].data = d.med_sim;
+        }else{
+          rlChart.data.datasets[0].data = d.Median_qed;   /* ★ 修改 */
+          rlChart.data.datasets[1].data = d.Median_sim;   /* ★ 修改 */
+        }
+        rlChart.update();
+      }
+
+      /* Top-8 更新（取前 8） */
+      if (d.top_mols){
+        molGrid.innerHTML = d.top_mols.slice(0,8).map(o=>{
+          const info = currentTarget==='logP'
+            ? `logP ${o.logp}<br>Sim ${o.sim}`
+            : `QED ${o.qed}<br>Sim ${o.sim}`;
+          return `
+            <div class="text-center space-y-1">
+              <img src="${o.img}" class="mol-img">
+              <div class="text-sm text-gray-700">${info}</div>
+            </div>`;
+        }).join('');
+      }
+
+      /* 訊息 & 下載 */
+      if (d.msg){
+        msgBar.textContent = d.msg;
+        msgBar.classList.remove('hidden');
+      }
+      if (d.download && !document.getElementById('dlBtn')){
+        const btn = `
+          <a id="dlBtn" href="${d.download}" download
+             class="bg-indigo-600 hover:bg-indigo-700 text-white
+                    px-4 py-2 rounded block text-center mt-6">
+            下載結果 TSV
+          </a>`;
+        molGrid.insertAdjacentHTML('beforebegin', btn);
+        es.close();                      /* 收到下載連結後才關閉 SSE */
+      }
+    };
+  });
+  </script>
+</body>
+</html>
+
