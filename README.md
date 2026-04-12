@@ -33,7 +33,57 @@ pip install flask requests numpy matplotlib cma rdkit
 
 若尚未安裝 RDKit，請參考官方文件：[RDKit Install Guide](https://www.rdkit.org/docs/Install.html)
 
-### 2. 設定 MolMIM backend 位址
+### 2. 快速架設 MolMIM backend
+
+建議直接依 NVIDIA 官方 MolMIM NIM 文件準備 backend：
+
+- Deploy: [NVIDIA MolMIM Deploy](https://build.nvidia.com/nvidia/molmim-generate/deploy)
+- Quickstart: [NVIDIA NIM for MolMIM Quickstart Guide](https://docs.nvidia.com/nim/bionemo/molmim/1.0.0/quickstart-guide.html)
+- Support Matrix: [NVIDIA NIM for MolMIM Support Matrix](https://docs.nvidia.com/nim/bionemo/molmim/1.0.0/support-matrix.html)
+- Endpoints: [NVIDIA NIM for MolMIM Endpoints](https://docs.nvidia.com/nim/bionemo/molmim/1.0.0/endpoints.html)
+
+依官方文件，至少先確認：
+
+- Docker 已安裝
+- NVIDIA Driver 與 NVIDIA Container Toolkit 已安裝
+- 本機有可用的 NVIDIA GPU
+
+官方文件列出的最低硬體需求包含：
+
+- 4 CPU cores
+- 16 GB RAM
+- 50 GB NVMe SSD
+- 1 張支援的 NVIDIA GPU
+
+依 deploy 頁面，先準備 NVIDIA API key 並登入 registry：
+
+```bash
+docker login nvcr.io
+```
+
+登入時使用者名稱填 `$oauthtoken`，密碼填你的 NVIDIA API key。
+
+接著可直接照官方 quickstart 啟動：
+
+```bash
+docker pull nvcr.io/nim/nvidia/molmim:1.0.0
+
+docker run --rm -it --name molmim --runtime=nvidia \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  -e NGC_CLI_API_KEY \
+  -p 8000:8000 \
+  nvcr.io/nim/nvidia/molmim:1.0.0
+```
+
+等到 health check 回傳 `{"status":"ready"}` 之後，再讓本專案連過去：
+
+```bash
+curl -X GET http://localhost:8000/v1/health/ready -H 'accept: application/json'
+```
+
+這個專案目前會使用 MolMIM backend 的 `/hidden` 與 `/decode` 端點。
+
+### 3. 設定 MolMIM backend 位址
 
 預設會連到本機的 `http://127.0.0.1:8000`。如果你的 MolMIM backend 跑在其他位址，請先設定：
 
@@ -46,7 +96,7 @@ export MOLMIM_API_BASE=http://127.0.0.1:8000
 - `${MOLMIM_API_BASE}/decode`
 - `${MOLMIM_API_BASE}/hidden`
 
-### 3. 啟動 Web 介面
+### 4. 啟動 Web 介面
 
 ```bash
 cd molmim_rf
@@ -60,7 +110,7 @@ app.py ready  (targets: logP / QED)
  * Running on http://127.0.0.1:5000
 ```
 
-### 4. 開啟瀏覽器
+### 5. 開啟瀏覽器
 
 ```text
 http://127.0.0.1:5000
@@ -68,5 +118,23 @@ http://127.0.0.1:5000
 
 ## 備註
 
-- 這個 repo 不包含 MolMIM backend 本體，需自行準備對應的 `/decode` 與 `/hidden` 服務。
+- 這個 repo 不包含 MolMIM backend 本體，需自行準備對應的 MolMIM NIM 或相容服務。
 - 目前前端 selector 僅提供 `logP` 與 `QED`。若要加入新目標，可比照 `engines/` 內模組擴充。
+
+## Citation
+
+若你在研究、簡報或衍生專案中使用了這個流程，建議至少引用下列官方與模型相關資料：
+
+- NVIDIA MolMIM Deploy: [https://build.nvidia.com/nvidia/molmim-generate/deploy](https://build.nvidia.com/nvidia/molmim-generate/deploy)
+- NVIDIA MolMIM Model Card: [https://build.nvidia.com/nvidia/molmim-generate/modelcard](https://build.nvidia.com/nvidia/molmim-generate/modelcard)
+- NVIDIA BioNeMo Framework MolMIM docs: [https://docs.nvidia.com/bionemo-framework/1.10/models/molmim.html](https://docs.nvidia.com/bionemo-framework/1.10/models/molmim.html)
+- Improving Small Molecule Generation using Mutual Information Machine
+- MIM: Mutual Information Machine
+- The CMA Evolution Strategy: A Comparing Review
+
+## License
+
+- 本 repo 是一個與 MolMIM backend 整合的前端與流程樣板，不隨附 NVIDIA MolMIM model weights 或 NIM container。
+- NVIDIA 的 MolMIM 頁面說明，API 使用需遵守 [NVIDIA API Trial Terms of Service](https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf)，模型使用需遵守 [NVIDIA AI Foundation Models Community License](https://docs.nvidia.com/ai-foundation-models-community-license.pdf)。
+- NVIDIA BioNeMo Framework 的 MolMIM 文件另外註明 framework 版 MolMIM 「provided under the Apache License」。若你使用的是 framework 權重或相關發行內容，請以 NVIDIA 對應文件中的授權條款為準。
+- 使用、下載或重新散布任何 NVIDIA MolMIM 相關資產前，請先閱讀並遵守 NVIDIA 官方文件與授權條款。
