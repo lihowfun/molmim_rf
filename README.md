@@ -120,6 +120,7 @@ http://127.0.0.1:5000
 
 - 這個 repo 不包含 MolMIM backend 本體，需自行準備對應的 MolMIM NIM 或相容服務。
 - 目前前端 selector 僅提供 `logP` 與 `QED`。若要加入新目標，可比照 `engines/` 內模組擴充。
+- 前端預設起始分子已改為 NVIDIA BioNeMo MolMIM IPython 範例中的 `imatinib`，並附上同一範例的 `erlotinib` 與 `gifitinib/gefitinib` 一鍵切換按鈕。這組例子來自 NVIDIA 的 CMA-ES notebook，其「Define starting molecules」段落列出三個起始 SMILES。[來源](https://docs.nvidia.com/bionemo-framework/1.10/notebooks/cma_es_guided_molecular_optimization_molmim.html)
 
 ## Citation
 

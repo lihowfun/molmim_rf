@@ -32,7 +32,15 @@
   <form id="taskForm" class="space-y-4 max-w-2xl mx-auto">
     <label class="block font-medium mb-1">輸入分子 (SMILES) — 只取第一行</label>
     <textarea id="smilesTxt" rows="4"
-              class="w-full rounded border p-3"></textarea>
+              class="w-full rounded border p-3">CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5</textarea>
+    <div class="text-sm text-slate-600 space-y-2">
+      <p>預設使用 NVIDIA BioNeMo MolMIM IPython 範例中的起始分子 `imatinib`。你也可以一鍵切換到同一組範例中的其他分子。</p>
+      <div id="sampleSeedButtons" class="flex flex-wrap gap-2">
+        <button type="button" class="border rounded px-3 py-1 bg-white hover:bg-slate-100" data-seed="CC1=C(C=C(C=C1)NC(=O)C2=CC=C(C=C2)CN3CCN(CC3)C)NC4=NC=CC(=N4)C5=CN=CC=C5">Imatinib</button>
+        <button type="button" class="border rounded px-3 py-1 bg-white hover:bg-slate-100" data-seed="COCCOC1=C(C=C2C(=C1)C(=NC=N2)NC3=CC=CC(=C3)C#C)OCCOC">Erlotinib</button>
+        <button type="button" class="border rounded px-3 py-1 bg-white hover:bg-slate-100" data-seed="C1COCCN1CCCOc2c(OC)cc3ncnc(c3c2)Nc4cc(Cl)c(F)cc4">Gefitinib</button>
+      </div>
+    </div>
 
     <div class="flex items-center space-x-4">
       <label class="font-medium">目標指標</label>
@@ -99,12 +107,20 @@
   const progressSec = document.getElementById('progressSec');
   const molGrid     = document.getElementById('molGrid');
   const msgBar      = document.getElementById('msgBar');
+  const smilesTxt   = document.getElementById('smilesTxt');
+  const sampleSeedButtons = document.getElementById('sampleSeedButtons');
+
+  sampleSeedButtons.addEventListener('click', e => {
+    const button = e.target.closest('button[data-seed]');
+    if (!button) return;
+    smilesTxt.value = button.dataset.seed;
+    smilesTxt.focus();
+  });
 
   /* -------- 提交表單 -------- */
   form.addEventListener('submit', async e=>{
     e.preventDefault();
-    const seed   = document.getElementById('smilesTxt')
-                     .value.trim().split(/\s+/)[0];
+    const seed   = smilesTxt.value.trim().split(/\s+/)[0];
     const target = document.getElementById('targetSel').value;
     if (!seed){ alert('請輸入 SMILES'); return; }
 
@@ -176,4 +192,3 @@
   </script>
 </body>
 </html>
-
